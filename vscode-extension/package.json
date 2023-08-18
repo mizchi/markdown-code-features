@@ -70,6 +70,7 @@
         "postinstall": "stale-dep -u",
         "prepare": "simple-git-hooks",
         "clean": "npx rimraf -rf ./out",
+        "build": "pnpm esbuild:base --minify --sourcemap",
         "esbuild:base": "stale-dep && tsx scripts/esbuild.ts",
         "esbuild:watch": "pnpm esbuild:base --sourcemap --watch",
         "esbuild:analyze": "pnpm esbuild:base --minify --metafile --analyze && esbuild-visualizer --metadata ./meta.json --open",
@@ -77,9 +78,7 @@
         "lint": "eslint src --ext ts",
         "test": "stale-dep && pnpm compile:test && node ./out/test/runTests.js",
         "package": "vsce package --no-dependencies",
-        "release": "npx @yutengjing/release",
-        "publish:vs-marketplace": "vsce publish --no-dependencies",
-        "publish:open-vsx": "ovsx publish --no-dependencies"
+        "publish": "vsce publish --no-dependencies"
     },
     "devDependencies": {
         "@mdx-js/mdx": "^2.3.0",
