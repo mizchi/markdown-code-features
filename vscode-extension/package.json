@@ -1,7 +1,7 @@
 {
     "name": "markdown-code-features",
     "displayName": "LSP in markdown code block",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "description": "LSP in markdown code block",
     "publisher": "mizchi",
     "private": true,
