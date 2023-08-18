@@ -32,8 +32,33 @@ Install and `markdown-code-features.enabled: true` in .vscode/settings.json
 - [ ] compiler: run tests
 - [ ] compiler: run with mdx component
 
+## Develop
 
----
+```bash
+# for test
+code vscode-extensions
+```
+
+- Run and Debug on Vscode > Run (F5)
+
+## Local install
+
+```bash
+# cd vscode-extenions
+$ pnpm install
+$ pnpm build
+$ pnpm package # generate markdown-code-features-x.x.x.vsix
+```
+
+Local install
+
+- Install `ctrl-shift-p` in vscode
+- `Extensions: Install from VSIX` and select it
+
+
+-----------------------
+
+original readme
 
 # vscode extension boilerplate
 
