@@ -1,8 +1,8 @@
 {
     "name": "markdown-code-features",
-    "displayName": "LSP in markdown code block",
+    "displayName": "Markdown Code Features",
     "version": "0.0.2",
-    "description": "LSP in markdown code block",
+    "description": "Markdown Code Features",
     "publisher": "mizchi",
     "private": true,
     "preview": true,
@@ -10,14 +10,14 @@
         "name": "mizchi"
     },
     "license": "SEE LICENSE IN LICENSE",
-    "homepage": "https://github.com/tjx666/awesome-vscode-extension-boilerplate/blob/master/README.md",
+    "homepage": "https://github.com/mizchi/markdown-code-features/blob/main/vscode-extension/README.md",
     "repository": {
         "type": "git",
-        "url": "https://github.com/tjx666/awesome-vscode-extension-boilerplate"
+        "url": "https://github.com/mizchi/markdown-code-features"
     },
     "bugs": {
-        "url": "https://github.com/tjx666/awesome-vscode-extension-boilerplate/issues",
-        "email": "ytj2713151713@gmail.com"
+        "url": "https://github.com/mizchi/markdown-code-features/issues",
+        "email": "miz404@gmail.com"
     },
     "keywords": [
         "boilerplate",
