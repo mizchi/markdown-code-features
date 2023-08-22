@@ -1,16 +1,30 @@
 {
   "compilerOptions": {
-    "target": "es2020",
-    "module": "ES2022",
-    "strict": true,
-    "jsx": "react-jsx",
-    "esModuleInterop": true,
-    "allowImportingTsExtensions": true,
-    "moduleResolution": "Bundler",
-    "forceConsistentCasingInFileNames": true,
-    "paths": {
-      "@*": ["./__*"]
-    }
-  },
-  "include": ["*.ts", "*.tsx"]
+      "composite": true,
+      "sourceMap": true,
+
+      /* Basic Options */
+      "target": "ES2022",
+      "module": "commonjs",
+
+      /* Strict Type-Checking Options */
+      "strict": true,
+
+      /* Additional Checks */
+      "noImplicitReturns": true,
+      "noFallthroughCasesInSwitch": true,
+
+      /* Module Resolution Options */
+      "moduleResolution": "node",
+      "esModuleInterop": true,
+      "resolveJsonModule": true,
+
+      /* Experimental Options */
+      "experimentalDecorators": true,
+      "emitDecoratorMetadata": true,
+
+      /* Advanced Options */
+      "forceConsistentCasingInFileNames": true,
+      "skipLibCheck": true
+  }
 }

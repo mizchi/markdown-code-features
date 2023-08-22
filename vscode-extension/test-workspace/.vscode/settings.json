@@ -1,9 +1,16 @@
 {
-  "prisma.fileWatcher": false,
   "deno.enable": false,
   "markdown-code-features.enable": true,
   "github.copilot.enable": {
     "*": false,
   },
-  "mdx.experimentalLanguageServer": false
+
+  "mdx.experimentalLanguageServer": false,
+  "[markdown]": {
+    "editor.quickSuggestions": {
+        "comments": true,
+        "strings": true,
+        "other": true
+    }
+  }
 }

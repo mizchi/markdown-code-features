@@ -5,7 +5,7 @@ export type CodeBlock = {
   codeRange: Range;
   content: string;
   id: string | undefined;
-  lang: string;
+  lang: string | undefined;
 };
 
 export function extractCodeBlocks(text: string) {
@@ -13,13 +13,13 @@ export function extractCodeBlocks(text: string) {
   for (const match of text.matchAll(regex)) {
     const { content, type } = match.groups! as {
       content: string;
-      type: string;
+      type?: string;
     };
     const start = match.index!;
     const end = start + match[0].length;
-    const codeStart = start + 3 + type.length + 1;
+    const codeStart = start + 3 + (type?.length ?? 0) + 1;
     const codeEnd = codeStart + content.length;
-    const [lang, id] = type.split(":");
+    const [lang, id] = type?.split(":") ?? [undefined, undefined];
     blocks.push({
       blockRange: [start, end],
       codeRange: [codeStart, codeEnd],

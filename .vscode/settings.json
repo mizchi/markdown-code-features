@@ -1,3 +1,10 @@
 {
-  "markdown-code-features.enable": true
+  "markdown-code-features.enable": true,
+  "[markdown]": {
+    "editor.quickSuggestions": {
+        "comments": true,
+        "strings": true,
+        "other": true
+    }
+  }
 }

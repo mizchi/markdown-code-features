@@ -16,13 +16,21 @@ Install and `markdown-code-features.enabled: true` in .vscode/settings.json
 
 ```json
 {
-  "markdow-code-features.enable": true
+  "markdow-code-features.enable": true,
+  // enable completion for markdown
+  "[markdown]": {
+    "editor.quickSuggestions": {
+        "comments": true,
+        "strings": true,
+        "other": true
+    }
+  }
 }
 ```
 
 ## TODO
 
-- [ ] activate in `.md` and `.mdx`
+- [x] activate in `.md` and `.mdx`
 - [x] typescript: completion
 - [x] typescript: diagnostics
 - [ ] css: completion

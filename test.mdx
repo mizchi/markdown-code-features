@@ -5,12 +5,13 @@ Support diagnostics and completion in markdown code block
 - markdown-compiler
 - vscode
 
-
 ## Example
 
 ```ts
 import { ex } from "./index";
+type X = typeof ex;
 
+globalThis.ex = ex;
 const x: string = ex;
 
 // @ts-expect-error

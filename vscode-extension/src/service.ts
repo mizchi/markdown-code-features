@@ -6,7 +6,7 @@ import { blue, bold, gray, green } from "colorette";
 
 export interface IncrementalSnapshot extends ts.IScriptSnapshot {
   /** If snapshot analyzed by typeChecker, it will be true */
-  loaded?: boolean;
+  // loaded?: boolean;
   incremental?: boolean;
 }
 
@@ -228,8 +228,6 @@ export function createIncrementalLanguageServiceHost(
   }
 
   function notifyFileChanged(fileName: string) {
-    // fileContents.delete(fileName);
-    // fileSnapshots.delete(fileName);
     const lastVersion = fileVersions.get(fileName) ?? 0;
     fileVersions.set(fileName, lastVersion + 1);
   }
@@ -324,8 +322,6 @@ export function createIncrementalLanguageServiceHost(
       if (rawFileResult) {
         fileContents.set(fname, rawFileResult);
         fileVersions.set(fname, fileVersions.get(fname) ?? 0);
-        // write cache on init
-        // const snapshot = ts.ScriptSnapshot.fromString(rawFileResult) as IncrementalSnapshot;
         const snapshot = createIncrementalSnapshot(rawFileResult);
         fileSnapshots.set(fname, snapshot);
       }
@@ -334,9 +330,6 @@ export function createIncrementalLanguageServiceHost(
     writeFile: (fileName, content) => {
       fileName = normalizePath(fileName);
       log("writeFile:dummy", fileName, `${content.length}bytes`);
-      // fileContents.set(fileName, content);
-      // const version = fileVersions.get(fileName) || 0;
-      // fileVersions.set(fileName, version + 1);
     },
     getScriptSnapshot: (fileName) => {
       fileName = normalizePath(fileName);
@@ -344,17 +337,16 @@ export function createIncrementalLanguageServiceHost(
       //   log("getScriptSnapshot", fileName);
       // }
       if (fileSnapshots.has(fileName)) {
-        const snapshot = fileSnapshots.get(fileName)!;
-        snapshot.loaded = true;
-        return snapshot;
+        return fileSnapshots.get(fileName)!;
       }
       if (!fs.existsSync(fileName)) return;
       const raw = ts.sys.readFile(fileName, "utf8")!;
-      const prev = fileSnapshots.get(fileName);
-      const snapshot = createIncrementalSnapshot(raw, undefined, prev);
-      snapshot.loaded = true;
-      fileSnapshots.set(fileName, snapshot);
-      return snapshot;
+      return createIncrementalSnapshot(raw);
+      // const prev = fileSnapshots.get(fileName);
+      // const snapshot = createIncrementalSnapshot(raw, undefined, prev);
+      // // snapshot.loaded = true;
+      // fileSnapshots.set(fileName, snapshot);
+      // return snapshot;
     },
     getScriptVersion: (fileName) => {
       fileName = normalizePath(fileName);
@@ -374,52 +366,7 @@ export function createIncrementalSnapshot(
   [start, end]: [number, number] = [0, content.length],
   prevSnapshot?: IncrementalSnapshot,
 ): IncrementalSnapshot {
-  const s = ts.ScriptSnapshot.fromString(content) as IncrementalSnapshot;
-  s.loaded = false;
-  return s;
-
   const snapshot = ts.ScriptSnapshot.fromString(content) as IncrementalSnapshot;
-  snapshot.getChangeRange = (
-    oldSnapshot: ts.IScriptSnapshot,
-  ): ts.TextChangeRange => {
-    // if (oldSnapshot) {
-    // const range = oldSnapshot.getChangeRange(oldSnapshot);
-    // if (range) {
-    //   const minStart = Math.min(range.span.start, start);
-    //   const maxEnd = Math.max(range.span.start + range.span.length, end);
-    //   return {
-    //     span: {
-    //       start: minStart,
-    //       length: maxEnd - minStart,
-    //     },
-    //     newLength: content.length,
-    //   }
-    // }
-    // }
-    if (prevSnapshot?.incremental) {
-      const range = prevSnapshot.getChangeRange(prevSnapshot);
-      if (range) {
-        const minStart = Math.min(range.span.start, start);
-        const maxEnd = Math.max(range.span.start + range.span.length, end);
-        return {
-          span: {
-            start: minStart,
-            length: maxEnd - minStart,
-          },
-          newLength: content.length,
-        };
-      }
-    }
-    return {
-      span: {
-        start,
-        length: end - start,
-      },
-      newLength: content.length,
-    };
-  };
-  snapshot.loaded = false;
-  snapshot.incremental = true;
   return snapshot;
 }
 

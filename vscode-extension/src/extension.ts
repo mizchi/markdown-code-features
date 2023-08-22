@@ -42,7 +42,7 @@ async function _start(context: vscode.ExtensionContext) {
   let timeoutId: NodeJS.Timeout | null = null;
 
   // const isVirtualFile = (fileName: string) => fileName.includes(".mdx@");
-  const isVirtualFile = (fileName: string) => /\.mdx@.*/.test(fileName);
+  const isVirtualFile = (fileName: string) => /\.mdx?@.*/.test(fileName);
   const isExsitedMdx = (fileName: string) => /\.mdx?$/.test(fileName);
 
   const completion = createCompletionProvider(service);
@@ -64,7 +64,6 @@ async function _start(context: vscode.ExtensionContext) {
     }),
     vscode.workspace.onDidChangeTextDocument((ev) => {
       if (!extensionEnabled) return;
-
       const fileName = ev.document.fileName;
       if (SUPPORTED_EXTENIONS.some((ext) => fileName.endsWith(ext))) {
         service.notifyFileChanged(fileName);
@@ -74,7 +73,6 @@ async function _start(context: vscode.ExtensionContext) {
     // external: on rename
     vscode.workspace.onDidRenameFiles((ev) => {
       if (!extensionEnabled) return;
-
       const oldFileNames = ev.files.map((f) => f.oldUri.fsPath);
       for (const old of oldFileNames) {
         if (isVirtualFile(old)) return;
@@ -86,7 +84,6 @@ async function _start(context: vscode.ExtensionContext) {
     // external: on delete
     vscode.workspace.onDidDeleteFiles((ev) => {
       if (!extensionEnabled) return;
-
       const fileNames = ev.files.map((f) => f.fsPath);
       for (const fileName of fileNames) {
         if (isVirtualFile(fileName)) return;
@@ -119,9 +116,17 @@ async function _start(context: vscode.ExtensionContext) {
           timeoutId = null;
           // TODO: check intersection
           const content = ev.document.getText();
-          const blocks = refresh(service, ev.document.fileName, content);
+          const changes = ev.contentChanges.map((change) => {
+            // return vscode range
+            return {
+              start: change.rangeOffset,
+              end: change.rangeOffset + change.rangeLength
+            };
+          });
+          const blocks = refresh(service, ev.document.fileName, content, changes);
           const diags: MyDiagnostic[] = blocks.flatMap((block) => {
             // Now only typescript
+            if (!block.lang) return [];
             if (!SUPPORTED_LANGUAGES.includes(block.lang)) return [];
             // TODO: highlight by language mode
             const tsSemanticDiagnostics = service.getSemanticDiagnostics(
@@ -151,7 +156,7 @@ async function _start(context: vscode.ExtensionContext) {
       if (!extensionEnabled) return;
       if (isExsitedMdx(ev.fileName)) {
         const content = ev.getText();
-        refresh(service, ev.fileName, content);
+        refresh(service, ev.fileName, content, undefined);
       }
     }),
     // register completion
@@ -162,7 +167,6 @@ async function _start(context: vscode.ExtensionContext) {
     diagnosticCollection,
   );
   return;
-  // console.log("activated");
   function createLanguageService(rootDir: string, currentFileName?: string) {
     const registory = ts.createDocumentRegistry();
     const configFile = ts.findConfigFile(rootDir, ts.sys.fileExists);
@@ -191,21 +195,46 @@ async function _start(context: vscode.ExtensionContext) {
     fileName: string,
     rawContent: string,
     // TODO: use partial update
-    _ranges: vscode.Range[] = [],
+    ranges: {start: number, end: number}[] | undefined,
   ) {
-    console.time("mdx:refresh");
+    console.time("mdcf:refresh");
+    // console.time("mdcf:extract");
     const blocks = extractCodeBlocks(rawContent);
+    // console.timeEnd("mdcf:extract");
+
     const lastVirtualFileNames = virtualContents.get(fileName) ?? [];
     // update virtual files
-    const vfileNames = blocks.map((block, idx) =>
-      createVirtualFileFromCodeBlock(fileName, block, idx, rawContent),
-    );
+    const vfileNames = blocks.map((block, idx) => {
+      const id = block.id ?? idx.toString();
+      const virtualFileName = getVirtualFileName(fileName, id);
+
+      // check is changed
+      if (ranges) {
+        const isChanged = ranges.some(({ start, end }) => {
+          return block.codeRange[0] <= start && end <= block.codeRange[1];
+        });
+        if (!isChanged) {
+          console.log("[mdx] not changed", virtualFileName);
+          // return virtualFileName;
+        }
+      }
+
+      // xxxx
+      const maskedPrefix = [...rawContent.slice(0, block.codeRange[0])]
+        .map((c) => (c === "\n" ? c : " "))
+        .join("");
+      service.writeSnapshot(
+        virtualFileName,
+        ts.ScriptSnapshot.fromString(maskedPrefix + block.content),
+      );
+      return virtualFileName;
+    });
     // remove unused virtual files
     lastVirtualFileNames
       .filter((vfileName) => !vfileNames.includes(vfileName))
       .forEach((vfileName) => service.deleteSnapshot(vfileName));
     virtualContents.set(fileName, vfileNames);
-    console.timeEnd("mdx:refresh");
+    console.timeEnd("mdcf:refresh");
     return blocks.map((block, idx) => {
       return {
         ...block,
@@ -216,23 +245,6 @@ async function _start(context: vscode.ExtensionContext) {
     function getVirtualFileName(originalFileName: string, localId: string) {
       const finalLocalId = /\.tsx?$/.test(localId) ? localId : `${localId}.tsx`;
       return `${originalFileName}@${finalLocalId}`;
-    }
-    function createVirtualFileFromCodeBlock(
-      originalFileName: string,
-      block: CodeBlock,
-      idx: number,
-      raw: string,
-    ) {
-      const id = block.id ?? idx.toString();
-      const virtualFileName = getVirtualFileName(originalFileName, id);
-      const maskedPrefix = [...raw.slice(0, block.codeRange[0])]
-        .map((c) => (c === "\n" ? c : " "))
-        .join("");
-      service.writeSnapshot(
-        virtualFileName,
-        ts.ScriptSnapshot.fromString(maskedPrefix + block.content),
-      );
-      return virtualFileName;
     }
   }
 
@@ -248,9 +260,17 @@ async function _start(context: vscode.ExtensionContext) {
         _context: vscode.CompletionContext,
       ) {
         if (extensionEnabled === false) return [];
-        const blocks = refresh(service, document.fileName, document.getText());
+        // offset with range
         const offset = document.offsetAt(position);
+
+        const blocks = refresh(service, document.fileName, document.getText(), [
+          {
+            start: offset,
+            end: offset + 1,
+          }
+        ]);
         const block = blocks.find(({ lang, codeRange: [start, end] }) => {
+          if (!lang) return false;
           if (!SUPPORTED_LANGUAGES.includes(lang)) return false;
           // in range
           return start <= offset && offset <= end;
