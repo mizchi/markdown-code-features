@@ -1,11 +1,11 @@
 {
   "deno.enable": false,
-  "markdown-code-features.enable": true,
+  "mdx.experimentalLanguageServer": false,
   "github.copilot.enable": {
     "*": false,
   },
 
-  "mdx.experimentalLanguageServer": false,
+  "markdown-code-features.enable": true,
   "[markdown]": {
     "editor.quickSuggestions": {
         "comments": true,

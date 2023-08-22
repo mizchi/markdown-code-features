@@ -130,7 +130,6 @@ export function createIncrementalLanguageServiceHost(
     }
     return item;
   };
-
   const log = createLogger("[Host]", debug, stripRoot(projectRoot), colorlize);
 
   // Setup compiler options

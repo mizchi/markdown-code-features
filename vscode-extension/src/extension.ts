@@ -27,6 +27,20 @@ const SUPPORTED_LANGUAGES = [
   "javascriptreact",
 ];
 
+const DefaultCompilerOptions: ts.CompilerOptions = {
+  lib: ["esnext", "dom", "dom.iterable"],
+  target: ts.ScriptTarget.ESNext,
+  module: ts.ModuleKind.ESNext,
+  jsx: ts.JsxEmit.ReactJSX,
+  allowJs: true,
+  allowSyntheticDefaultImports: true,
+  strict: true,
+  esModuleInterop: true,
+  moduleResolution: ts.ModuleResolutionKind.NodeJs,
+  resolveJsonModule: true,
+};
+
+
 let extensionEnabled = false;
 async function _start(context: vscode.ExtensionContext) {
   // fileName -> virtualFiles
@@ -170,22 +184,21 @@ async function _start(context: vscode.ExtensionContext) {
   function createLanguageService(rootDir: string, currentFileName?: string) {
     const registory = ts.createDocumentRegistry();
     const configFile = ts.findConfigFile(rootDir, ts.sys.fileExists);
-    const tsconfig = ts.readConfigFile(configFile!, ts.sys.readFile);
-    const options = ts.parseJsonConfigFileContent(
-      {
-        ...tsconfig.config,
-        // paths: currentFileName && {
-        //   // for local import
-        //   // ex: import { foo } from "@foo";
-        //   "@*": [`./${currentFileName}@*`],
-        // },
-      },
-      ts.sys,
-      rootDir,
-    );
+
+    let fileNames: string[] = [];
+    if (configFile) {
+      const tsconfig = ts.readConfigFile(configFile, ts.sys.readFile);
+      const options = ts.parseJsonConfigFileContent(
+        tsconfig.config,
+        ts.sys,
+        rootDir,
+      );
+      fileNames = options.fileNames;
+    }
     const host = createIncrementalLanguageServiceHost(
       rootDir,
-      options.fileNames,
+      fileNames,
+      !configFile ? DefaultCompilerOptions : undefined,
     );
     return createIncrementalLanguageService(host, registory);
   }

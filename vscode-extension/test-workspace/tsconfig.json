@@ -7,6 +7,7 @@
     "esModuleInterop": true,
     "allowImportingTsExtensions": true,
     "moduleResolution": "Bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "forceConsistentCasingInFileNames": true,
     "paths": {
       "@*": ["./__*"]

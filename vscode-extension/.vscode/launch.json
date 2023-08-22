@@ -11,6 +11,7 @@
             "request": "launch",
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}",
+                "--disable-extensions",
                 "${workspaceFolder}/test-workspace"
             ],
             "outFiles": ["${workspaceFolder}/out/**/*.js"],
@@ -27,6 +28,30 @@
             },
             "preLaunchTask": "${defaultBuildTask}"
         },
+        {
+            "name": "Dev2",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}",
+                "--disable-extensions",
+                "${workspaceFolder}/test-workspace2"
+            ],
+            "outFiles": ["${workspaceFolder}/out/**/*.js"],
+            "skipFiles": [
+                "<node_internals>/**",
+                "**/node_modules/**",
+                "**/resources/app/out/vs/**",
+                "**/.vscode-insiders/extensions/",
+                "**/.vscode/extensions/"
+            ],
+            "sourceMaps": true,
+            "env": {
+                "VSCODE_DEBUG_MODE": "true"
+            },
+            "preLaunchTask": "${defaultBuildTask}"
+        },
+
         {
             "name": "Test",
             "type": "extensionHost",
