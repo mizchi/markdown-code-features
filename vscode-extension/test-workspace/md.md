@@ -1,12 +1,13 @@
 # aouea
 
 ```ts
-let x = 1;
+let x: string = 1;
 globalThis.gc;
 function foooooooo() {
 
 }
 
 foooooooo();
+
 // global.gc = 1;
 ```

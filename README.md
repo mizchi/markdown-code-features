@@ -17,6 +17,7 @@ const x: string = ex;
 let num: number = "";
 
 console.log("hello");
+
 function hello() {
   console.log("");
 }

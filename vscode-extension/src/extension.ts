@@ -6,8 +6,9 @@ import {
   createIncrementalLanguageService,
   createIncrementalLanguageServiceHost,
 } from "./service";
-import { CodeBlock, extractCodeBlocks } from "./markdown";
+import { extractCodeBlocks } from "@mizchi/mdcf-compiler/src/index";
 import { tsCompletionEntryToVscodeCompletionItem } from "./vsHelpers";
+// import { value } from "@mizchi/mdcf-compiler/src/index";
 
 type MyDiagnostic = vscode.Diagnostic & {
   vfileName: string;
@@ -39,7 +40,6 @@ const DefaultCompilerOptions: ts.CompilerOptions = {
   moduleResolution: ts.ModuleResolutionKind.NodeJs,
   resolveJsonModule: true,
 };
-
 
 let extensionEnabled = false;
 async function _start(context: vscode.ExtensionContext) {
@@ -134,10 +134,15 @@ async function _start(context: vscode.ExtensionContext) {
             // return vscode range
             return {
               start: change.rangeOffset,
-              end: change.rangeOffset + change.rangeLength
+              end: change.rangeOffset + change.rangeLength,
             };
           });
-          const blocks = refresh(service, ev.document.fileName, content, changes);
+          const blocks = refresh(
+            service,
+            ev.document.fileName,
+            content,
+            changes,
+          );
           const diags: MyDiagnostic[] = blocks.flatMap((block) => {
             // Now only typescript
             if (!block.lang) return [];
@@ -208,7 +213,7 @@ async function _start(context: vscode.ExtensionContext) {
     fileName: string,
     rawContent: string,
     // TODO: use partial update
-    ranges: {start: number, end: number}[] | undefined,
+    ranges: { start: number; end: number }[] | undefined,
   ) {
     console.time("mdcf:refresh");
     // console.time("mdcf:extract");
@@ -280,7 +285,7 @@ async function _start(context: vscode.ExtensionContext) {
           {
             start: offset,
             end: offset + 1,
-          }
+          },
         ]);
         const block = blocks.find(({ lang, codeRange: [start, end] }) => {
           if (!lang) return false;
