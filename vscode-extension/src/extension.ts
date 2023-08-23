@@ -1,3 +1,4 @@
+import { workspace } from "vscode";
 // https://github.com/microsoft/vscode-extension-samples
 import * as vscode from "vscode";
 import ts from "typescript";
@@ -47,7 +48,9 @@ async function _start(context: vscode.ExtensionContext) {
   const virtualContents = new Map<string, string[]>();
   const root = vscode.workspace.workspaceFolders?.[0];
   const rootDir = root?.uri.fsPath!;
-  const service = createLanguageService(rootDir);
+  const services = new Map<string, IncrementalLanguageService>();
+
+  // const service = createLanguageService(rootDir);
   const diagnosticCollection = vscode.languages.createDiagnosticCollection(
     "markdown-code-features",
   );
@@ -59,7 +62,7 @@ async function _start(context: vscode.ExtensionContext) {
   const isVirtualFile = (fileName: string) => /\.mdx?@.*/.test(fileName);
   const isExsitedMdx = (fileName: string) => /\.mdx?$/.test(fileName);
 
-  const completion = createCompletionProvider(service);
+  const completion = createCompletionProvider(getOrCreateLanguageService);
 
   // TODO: check mdx is active to check
   context.subscriptions.push(
@@ -70,6 +73,7 @@ async function _start(context: vscode.ExtensionContext) {
       if (isVirtualFile(ev.fileName)) return;
       const fileName = ev.fileName;
       if (SUPPORTED_EXTENIONS.some((ext) => fileName.endsWith(ext))) {
+        const service = getOrCreateLanguageService(ev.uri);
         service.writeSnapshot(
           fileName,
           ts.ScriptSnapshot.fromString(ev.getText()),
@@ -80,6 +84,7 @@ async function _start(context: vscode.ExtensionContext) {
       if (!extensionEnabled) return;
       const fileName = ev.document.fileName;
       if (SUPPORTED_EXTENIONS.some((ext) => fileName.endsWith(ext))) {
+        const service = getOrCreateLanguageService(ev.document.uri);
         service.notifyFileChanged(fileName);
       }
     }),
@@ -87,10 +92,12 @@ async function _start(context: vscode.ExtensionContext) {
     // external: on rename
     vscode.workspace.onDidRenameFiles((ev) => {
       if (!extensionEnabled) return;
-      const oldFileNames = ev.files.map((f) => f.oldUri.fsPath);
-      for (const old of oldFileNames) {
+      // const oldFileNames = ev.files.map((f) => f.oldUri.fsPath);
+      for (const oldFile of ev.files) {
+        const old = oldFile.oldUri.fsPath;
         if (isVirtualFile(old)) return;
         if (SUPPORTED_EXTENIONS.some((ext) => old.endsWith(ext))) {
+          const service = getOrCreateLanguageService(oldFile.oldUri);
           service.deleteSnapshot(old);
         }
       }
@@ -98,10 +105,11 @@ async function _start(context: vscode.ExtensionContext) {
     // external: on delete
     vscode.workspace.onDidDeleteFiles((ev) => {
       if (!extensionEnabled) return;
-      const fileNames = ev.files.map((f) => f.fsPath);
-      for (const fileName of fileNames) {
+      for (const file of ev.files) {
+        const fileName = file.fsPath;
         if (isVirtualFile(fileName)) return;
         if (SUPPORTED_EXTENIONS.some((ext) => fileName.endsWith(ext))) {
+          const service = getOrCreateLanguageService(file);
           service.deleteSnapshot(fileName);
         }
       }
@@ -113,6 +121,7 @@ async function _start(context: vscode.ExtensionContext) {
         // clear diagnostics
         diagnosticCollection.delete(ev.uri);
         const fileNames = virtualContents.get(ev.fileName) ?? [];
+        const service = getOrCreateLanguageService(ev.uri);
         fileNames.forEach((vfileName) => service.deleteSnapshot(vfileName));
         virtualContents.delete(ev.fileName);
       }
@@ -137,6 +146,7 @@ async function _start(context: vscode.ExtensionContext) {
               end: change.rangeOffset + change.rangeLength,
             };
           });
+          const service = getOrCreateLanguageService(ev.document.uri);
           const blocks = refresh(
             service,
             ev.document.fileName,
@@ -175,6 +185,7 @@ async function _start(context: vscode.ExtensionContext) {
       if (!extensionEnabled) return;
       if (isExsitedMdx(ev.fileName)) {
         const content = ev.getText();
+        const service = getOrCreateLanguageService(ev.uri);
         refresh(service, ev.fileName, content, undefined);
       }
     }),
@@ -186,6 +197,18 @@ async function _start(context: vscode.ExtensionContext) {
     diagnosticCollection,
   );
   return;
+
+  function getOrCreateLanguageService(uri: vscode.Uri) {
+    const workspace = vscode.workspace.getWorkspaceFolder(uri);
+    const roodDir = workspace?.uri.fsPath!;
+    if (services.has(roodDir)) {
+      return services.get(roodDir)!;
+    }
+    const service = createLanguageService(rootDir);
+    services.set(roodDir, service);
+    return service;
+  }
+
   function createLanguageService(rootDir: string, currentFileName?: string) {
     const registory = ts.createDocumentRegistry();
     const configFile = ts.findConfigFile(rootDir, ts.sys.fileExists);
@@ -268,7 +291,8 @@ async function _start(context: vscode.ExtensionContext) {
 
   // https://qiita.com/qvtec/items/31d19dd8b86fcc19465a
   function createCompletionProvider(
-    service: IncrementalLanguageService,
+    // service: IncrementalLanguageService,
+    getService: (uri: vscode.Uri) => IncrementalLanguageService,
   ): vscode.CompletionItemProvider {
     return {
       provideCompletionItems(
@@ -280,7 +304,7 @@ async function _start(context: vscode.ExtensionContext) {
         if (extensionEnabled === false) return [];
         // offset with range
         const offset = document.offsetAt(position);
-
+        const service = getService(document.uri);
         const blocks = refresh(service, document.fileName, document.getText(), [
           {
             start: offset,

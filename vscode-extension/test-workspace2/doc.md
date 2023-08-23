@@ -7,6 +7,7 @@ function foooooooo() {
 }
 
 export const ex = 2;
+
 ```
 
 ```ts

@@ -4,25 +4,6 @@ Support diagnostics and completion in markdown code blocks.
 
 ![Alt text](https://raw.githubusercontent.com/mizchi/markdown-code-features/main/vscode-extension/demo.png)
 
-## Example
-
-```md:doc.md
-<!-- doc.md -->
-\`\`\`ts:foo.ts
-// virtual file in markdown
-export const foo = { value: 1 };
-\`\`\`
-
-\`\`\`ts
-// import from local file
-import Index from "./index";
-
-// import from self
-import { foo } from "./doc.md@foo";
-\`\`\`
-```
-
-(Now only for `ts` and `tsx` in `.md` and `.mdx`.)
 
 ## Features
 
@@ -33,16 +14,14 @@ import { foo } from "./doc.md@foo";
 - Import self code block file
   - Code block with `ts:foo.ts` and `import {} from "./self.md@foo.ts";`
 
-## Example
-
-## Run 
+## Settings
 
 Install and `markdown-code-features.enabled: true` in .vscode/settings.json
 
 ```json
 {
   "markdown-code-features.enable": true,
-  // enable completion for markdown
+  // to enable completion in markdown
   "[markdown]": {
     "editor.quickSuggestions": {
         "comments": true,
@@ -55,6 +34,7 @@ Install and `markdown-code-features.enabled: true` in .vscode/settings.json
 
 ## TODO
 
+- [ ] load diagnostics on load
 - [x] activate in `.md` and `.mdx`
 - [x] typescript: completion
 - [x] typescript: diagnostics

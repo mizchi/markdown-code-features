@@ -2,6 +2,7 @@
 
 ```ts
 let x: string = 1;
+
 globalThis.gc;
 function foooooooo() {
 
