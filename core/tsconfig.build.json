@@ -2,17 +2,18 @@
   "compilerOptions": {
     "sourceMap": true,
     "declaration": true,
-    "noEmit": true,
-    "allowImportingTsExtensions": true,
+    "outDir": "./lib",
+    "rootDir": "./src",
     "target": "ES2020",
-    "module": "Node16",
+    "module": "ESNext",
     "strict": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "moduleResolution": "Node16",
+    "moduleResolution": "node",
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
-  }
+  },
+  "include": ["src/**/*"],
 }

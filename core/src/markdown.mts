@@ -1,4 +1,4 @@
-import { langToExtMap } from "./constants";
+import { langToExtMap } from "./constants.mjs";
 // import path from 'path';
 
 const regex = new RegExp(/```(?<type>[^\n]*)?\n(?<content>[.\s\S\n]*?)\n```/gmu);

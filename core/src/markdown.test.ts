@@ -1,10 +1,10 @@
-import { extractCodeBlocks } from "./markdown";
+import { extractCodeBlocks } from "./markdown.mjs";
 import { test, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { rollup, Plugin } from "rollup";
 import ts from "typescript";
-import { markdownRunner } from "./rollup";
+import { markdownRunner } from "./rollup.mjs";
 
 test("extractCodeBlocks #1", () => {
   const case1 = fs.readFileSync(

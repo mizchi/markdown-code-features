@@ -1,5 +1,5 @@
 import { type Plugin } from "rollup";
-import { CodeBlock, extractCodeBlocks, getVirtualFileName } from "./markdown";
+import { CodeBlock, extractCodeBlocks, getVirtualFileName } from "./markdown.mjs";
 import path from "node:path";
 
 export function markdownRunner() {
