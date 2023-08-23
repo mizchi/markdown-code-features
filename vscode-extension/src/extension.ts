@@ -260,15 +260,6 @@ async function _start(context: vscode.ExtensionContext) {
     // update virtual files
     const vfileNames = blocks.map((block) => {
       const virtualFileName = fileName + "@" + getVirtualFileName(block);
-      // check is changed
-      // if (ranges) {
-      //   const isChanged = ranges.some(({ start, end }) => {
-      //     return block.codeRange[0] <= start && end <= block.codeRange[1];
-      //   });
-      //   if (!isChanged) {
-      //     DEBUG && console.log("[mdcf] not changed", virtualFileName);
-      //   }
-      // }
       const prefix = rawContent
         .slice(0, block.codeRange[0])
         .replace(/[^\n]/g, " ");
@@ -295,6 +286,7 @@ async function _start(context: vscode.ExtensionContext) {
     return blocks.map((block, idx) => {
       return {
         ...block,
+        // vfileName:  getVirtualFileName(block),
         vfileName: vfileNames[idx],
         index: idx,
       };
@@ -380,7 +372,9 @@ async function _start(context: vscode.ExtensionContext) {
             .slice(0, block.codeRange[0])
             .replace(/[^\n]/g, " ");
           const vContent = prefix + block.content;
+          // console.log("[mdcf:comp]", block.vfileName, vContent);
           virtualDocuments.set(block.vfileName, vContent);
+
           // trigger completion on virtual file
           const vdocUriString = `mdcf://${block.vfileName}`;
           // console.log("[mdcf:comp]", vdocUriString);

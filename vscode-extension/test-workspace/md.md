@@ -19,12 +19,13 @@ foooooooo();
 // global.gc = 1;
 ```
 
-```svelte
-```
-
 ```css
 div {
   color: aliceblue;
+}
+
+.foo {
+  display: block;
 }
 ```
 
@@ -40,4 +41,10 @@ div {
   
 </body>
 </html>
+```
+
+
+```html
+<div>
+</div>
 ```
