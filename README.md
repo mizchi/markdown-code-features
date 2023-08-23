@@ -5,11 +5,10 @@ Support diagnostics and completion in markdown code block
 - markdown-compiler
 - vscode
 
-
 ## Example
 
 ```ts
-import { ex } from "./index";
+import { ex } from "./examples/index";
 
 const x: string = ex;
 

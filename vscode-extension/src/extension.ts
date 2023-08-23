@@ -29,6 +29,8 @@ const SUPPORTED_LANGUAGES = [
   "javascriptreact",
 ];
 
+const DEBUG = false;
+
 const DefaultCompilerOptions: ts.CompilerOptions = {
   lib: ["esnext", "dom", "dom.iterable"],
   target: ts.ScriptTarget.ESNext,
@@ -43,24 +45,21 @@ const DefaultCompilerOptions: ts.CompilerOptions = {
 };
 
 let extensionEnabled = false;
+const isVirtualFile = (fileName: string) => /\.mdx?@.*/.test(fileName);
+const isExsitedMdx = (fileName: string) => /\.mdx?$/.test(fileName);
+
 async function _start(context: vscode.ExtensionContext) {
   // fileName -> virtualFiles
   const virtualContents = new Map<string, string[]>();
-  const root = vscode.workspace.workspaceFolders?.[0];
-  const rootDir = root?.uri.fsPath!;
+  const registory = ts.createDocumentRegistry();
   const services = new Map<string, IncrementalLanguageService>();
 
-  // const service = createLanguageService(rootDir);
   const diagnosticCollection = vscode.languages.createDiagnosticCollection(
     "markdown-code-features",
   );
 
   // update diagnostics by update
   let timeoutId: NodeJS.Timeout | null = null;
-
-  // const isVirtualFile = (fileName: string) => fileName.includes(".mdx@");
-  const isVirtualFile = (fileName: string) => /\.mdx?@.*/.test(fileName);
-  const isExsitedMdx = (fileName: string) => /\.mdx?$/.test(fileName);
 
   const completion = createCompletionProvider(getOrCreateLanguageService);
 
@@ -69,7 +68,6 @@ async function _start(context: vscode.ExtensionContext) {
     // external: on save
     vscode.workspace.onDidSaveTextDocument((ev) => {
       if (!extensionEnabled) return;
-
       if (isVirtualFile(ev.fileName)) return;
       const fileName = ev.fileName;
       if (SUPPORTED_EXTENIONS.some((ext) => fileName.endsWith(ext))) {
@@ -92,7 +90,6 @@ async function _start(context: vscode.ExtensionContext) {
     // external: on rename
     vscode.workspace.onDidRenameFiles((ev) => {
       if (!extensionEnabled) return;
-      // const oldFileNames = ev.files.map((f) => f.oldUri.fsPath);
       for (const oldFile of ev.files) {
         const old = oldFile.oldUri.fsPath;
         if (isVirtualFile(old)) return;
@@ -204,13 +201,12 @@ async function _start(context: vscode.ExtensionContext) {
     if (services.has(roodDir)) {
       return services.get(roodDir)!;
     }
-    const service = createLanguageService(rootDir);
+    const service = createLanguageService(roodDir);
     services.set(roodDir, service);
     return service;
   }
 
-  function createLanguageService(rootDir: string, currentFileName?: string) {
-    const registory = ts.createDocumentRegistry();
+  function createLanguageService(rootDir: string) {
     const configFile = ts.findConfigFile(rootDir, ts.sys.fileExists);
 
     let fileNames: string[] = [];
@@ -238,11 +234,9 @@ async function _start(context: vscode.ExtensionContext) {
     // TODO: use partial update
     ranges: { start: number; end: number }[] | undefined,
   ) {
-    console.time("mdcf:refresh");
+    DEBUG && console.time("mdcf:refresh");
     // console.time("mdcf:extract");
     const blocks = extractCodeBlocks(rawContent);
-    // console.timeEnd("mdcf:extract");
-
     const lastVirtualFileNames = virtualContents.get(fileName) ?? [];
     // update virtual files
     const vfileNames = blocks.map((block, idx) => {
@@ -255,7 +249,7 @@ async function _start(context: vscode.ExtensionContext) {
           return block.codeRange[0] <= start && end <= block.codeRange[1];
         });
         if (!isChanged) {
-          console.log("[mdx] not changed", virtualFileName);
+          DEBUG && console.log("[mdx] not changed", virtualFileName);
           // return virtualFileName;
         }
       }
@@ -275,7 +269,7 @@ async function _start(context: vscode.ExtensionContext) {
       .filter((vfileName) => !vfileNames.includes(vfileName))
       .forEach((vfileName) => service.deleteSnapshot(vfileName));
     virtualContents.set(fileName, vfileNames);
-    console.timeEnd("mdcf:refresh");
+    DEBUG && console.timeEnd("mdcf:refresh");
     return blocks.map((block, idx) => {
       return {
         ...block,
@@ -349,9 +343,7 @@ async function _start(context: vscode.ExtensionContext) {
 
 export async function activate(context: vscode.ExtensionContext) {
   const settings = vscode.workspace.getConfiguration("markdown-code-features");
-  console.log("[markdown-code]", settings);
   extensionEnabled = settings.get("enable") ?? false;
-
   vscode.workspace.onDidChangeConfiguration(async (ev) => {
     if (ev.affectsConfiguration("markdown-code-features")) {
       if (!extensionEnabled) {
@@ -363,7 +355,6 @@ export async function activate(context: vscode.ExtensionContext) {
         if (extensionEnabled) {
           await _start(context);
         }
-
         // TODO: fixme later
         if (lastState && !extensionEnabled) {
           vscode.window.showInformationMessage(
@@ -373,7 +364,6 @@ export async function activate(context: vscode.ExtensionContext) {
       }
     }
   });
-
   if (extensionEnabled) {
     await _start(context);
     return;
