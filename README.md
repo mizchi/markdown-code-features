@@ -2,22 +2,5 @@
 
 Support diagnostics and completion in markdown code block
 
-- markdown-compiler
-- vscode
+https://marketplace.visualstudio.com/items?itemName=mizchi.markdown-code-features
 
-## Example
-
-```ts
-import { ex } from "./examples/index";
-
-const x: string = ex;
-
-// @ts-expect-error
-let num: number = "";
-
-console.log("hello");
-
-function hello() {
-  console.log("");
-}
-```

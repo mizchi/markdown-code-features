@@ -1,5 +1,5 @@
 {
-  "name": "@mizchi/mdcf-compiler",
+  "name": "@mizchi/mdcf-core",
   "private": true,
   "devDependencies": {
     "rollup": "^3.28.0",

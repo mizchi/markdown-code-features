@@ -2,6 +2,8 @@
 
 Support diagnostics and completion in markdown code blocks.
 
+https://marketplace.visualstudio.com/items?itemName=mizchi.markdown-code-features
+
 ![Alt text](https://raw.githubusercontent.com/mizchi/markdown-code-features/main/vscode-extension/demo.png)
 
 
@@ -41,13 +43,14 @@ Install and `markdown-code-features.enabled: true` in .vscode/settings.json
 - [x] diagnostics: on load
 - [x] diagnostics: on change other contents
 - [ ] mdx: import/export completion
-- [ ] css: completion
-- [ ] html: completion
+- [x] css: completion
+- [x] html: completion
 - [ ] perf: selective update
+- [ ] vite/vitest plugin
 - [ ] compiler: run
 - [ ] compiler: run tests
 - [ ] compiler: run with mdx component
-- [ ] CLI: typechecker
+- [ ] cli: type-checker
 
 ## Develop
 
