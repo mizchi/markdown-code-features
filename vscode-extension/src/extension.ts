@@ -1,4 +1,3 @@
-import { workspace } from "vscode";
 // https://github.com/microsoft/vscode-extension-samples
 import * as vscode from "vscode";
 import ts from "typescript";
@@ -9,14 +8,22 @@ import {
 } from "./service";
 import { extractCodeBlocks } from "@mizchi/mdcf-compiler/src/index";
 import { tsCompletionEntryToVscodeCompletionItem } from "./vsHelpers";
-// import { value } from "@mizchi/mdcf-compiler/src/index";
 
 type MyDiagnostic = vscode.Diagnostic & {
   vfileName: string;
 };
 
-const SUPPORTED_EXTENIONS = [".ts", ".tsx", ".mts", ".mtsx", ".js", ".jsx"];
-const SUPPORTED_LANGUAGES = [
+const SUPPORTED_EXTENIONS = [
+  // extensions
+  ".ts",
+  ".tsx",
+  ".mts",
+  ".mtsx",
+  ".js",
+  ".jsx",
+];
+
+const SUPPORTED_SCRIPTS = [
   "ts",
   "tsx",
   "typescript",
@@ -28,6 +35,8 @@ const SUPPORTED_LANGUAGES = [
   "javascript",
   "javascriptreact",
 ];
+
+const SUPPORTED_LANGUAGES = [...SUPPORTED_SCRIPTS, "html", "css"];
 
 const DEBUG = false;
 
@@ -53,6 +62,14 @@ async function _start(context: vscode.ExtensionContext) {
   const virtualContents = new Map<string, string[]>();
   const registory = ts.createDocumentRegistry();
   const services = new Map<string, IncrementalLanguageService>();
+
+  // virtual html/css files
+  const virtualDocuments = new Map<string, string>();
+  vscode.workspace.registerTextDocumentContentProvider("mdcf", {
+    provideTextDocumentContent: (uri) => {
+      return virtualDocuments.get(uri.fsPath);
+    },
+  });
 
   const diagnosticCollection = vscode.languages.createDiagnosticCollection(
     "markdown-code-features",
@@ -84,6 +101,12 @@ async function _start(context: vscode.ExtensionContext) {
       if (SUPPORTED_EXTENIONS.some((ext) => fileName.endsWith(ext))) {
         const service = getOrCreateLanguageService(ev.document.uri);
         service.notifyFileChanged(fileName);
+        const mdDocs = vscode.workspace.textDocuments.filter((doc) => {
+          return isExsitedMdx(doc.fileName);
+        });
+        for (const doc of mdDocs) {
+          updateDiagnostics(doc, []);
+        }
       }
     }),
 
@@ -134,56 +157,28 @@ async function _start(context: vscode.ExtensionContext) {
         timeoutId && clearTimeout(timeoutId);
         timeoutId = setTimeout(() => {
           timeoutId = null;
-          // TODO: check intersection
-          const content = ev.document.getText();
-          const changes = ev.contentChanges.map((change) => {
-            // return vscode range
-            return {
-              start: change.rangeOffset,
-              end: change.rangeOffset + change.rangeLength,
-            };
-          });
-          const service = getOrCreateLanguageService(ev.document.uri);
-          const blocks = refresh(
-            service,
-            ev.document.fileName,
-            content,
-            changes,
-          );
-          const diags: MyDiagnostic[] = blocks.flatMap((block) => {
-            // Now only typescript
-            if (!block.lang) return [];
-            if (!SUPPORTED_LANGUAGES.includes(block.lang)) return [];
-            // TODO: highlight by language mode
-            const tsSemanticDiagnostics = service.getSemanticDiagnostics(
-              block.vfileName,
-            );
-            // https://code.visualstudio.com/api/language-extensions/programmatic-language-features
-            return tsSemanticDiagnostics.map((diag) => {
-              const start = ev.document.positionAt(diag.start!);
-              const end = ev.document.positionAt(diag.start! + diag.length!);
-              const d = new vscode.Diagnostic(
-                new vscode.Range(start, end),
-                (diag.messageText as string) ?? "unknown",
-                vscode.DiagnosticSeverity.Error,
-              );
-              return {
-                ...d,
-                vfileName: block.vfileName,
-              } as MyDiagnostic;
-            });
-          });
-          diagnosticCollection.set(ev.document.uri, diags);
+          updateDiagnostics(ev.document, ev.contentChanges);
         }, 300);
       }
     }),
     // mdx: on open
-    vscode.workspace.onDidOpenTextDocument((ev) => {
+    vscode.workspace.onDidOpenTextDocument((doc) => {
       if (!extensionEnabled) return;
-      if (isExsitedMdx(ev.fileName)) {
-        const content = ev.getText();
-        const service = getOrCreateLanguageService(ev.uri);
-        refresh(service, ev.fileName, content, undefined);
+      if (isExsitedMdx(doc.fileName)) {
+        DEBUG && console.log("[mdcf:open]", doc.fileName);
+        updateDiagnostics(doc, []);
+      }
+    }),
+    // open default editor
+    vscode.workspace.onDidChangeWorkspaceFolders((ev) => {
+      // close service on remove workspace
+      for (const removed of ev.removed) {
+        const rootDir = removed.uri.fsPath;
+        if (services.has(rootDir)) {
+          const service = services.get(rootDir)!;
+          service.dispose();
+          services.delete(rootDir);
+        }
       }
     }),
     // register completion
@@ -193,6 +188,15 @@ async function _start(context: vscode.ExtensionContext) {
     // register markdown completion
     diagnosticCollection,
   );
+
+  // on first open document
+  if (vscode.window.activeTextEditor) {
+    const fileName = vscode.window.activeTextEditor.document.fileName;
+    if (!extensionEnabled) return;
+    if (isExsitedMdx(fileName)) {
+      updateDiagnostics(vscode.window.activeTextEditor.document, []);
+    }
+  }
   return;
 
   function getOrCreateLanguageService(uri: vscode.Uri) {
@@ -219,10 +223,17 @@ async function _start(context: vscode.ExtensionContext) {
       );
       fileNames = options.fileNames;
     }
+
+    const getWorkspaceContent = (fpath: string) => {
+      return vscode.workspace.textDocuments
+        .find((doc) => doc.uri.fsPath.endsWith(fpath))
+        ?.getText();
+    };
     const host = createIncrementalLanguageServiceHost(
       rootDir,
       fileNames,
       !configFile ? DefaultCompilerOptions : undefined,
+      getWorkspaceContent,
     );
     return createIncrementalLanguageService(host, registory);
   }
@@ -232,7 +243,7 @@ async function _start(context: vscode.ExtensionContext) {
     fileName: string,
     rawContent: string,
     // TODO: use partial update
-    ranges: { start: number; end: number }[] | undefined,
+    _ranges: { start: number; end: number }[] | undefined,
   ) {
     DEBUG && console.time("mdcf:refresh");
     // console.time("mdcf:extract");
@@ -241,23 +252,19 @@ async function _start(context: vscode.ExtensionContext) {
     // update virtual files
     const vfileNames = blocks.map((block, idx) => {
       const id = block.id ?? idx.toString();
-      const virtualFileName = getVirtualFileName(fileName, id);
-
+      const virtualFileName = getVirtualFileName(fileName, id, block.lang);
       // check is changed
-      if (ranges) {
-        const isChanged = ranges.some(({ start, end }) => {
-          return block.codeRange[0] <= start && end <= block.codeRange[1];
-        });
-        if (!isChanged) {
-          DEBUG && console.log("[mdx] not changed", virtualFileName);
-          // return virtualFileName;
-        }
-      }
-
-      // xxxx
-      const maskedPrefix = [...rawContent.slice(0, block.codeRange[0])]
-        .map((c) => (c === "\n" ? c : " "))
-        .join("");
+      // if (ranges) {
+      //   const isChanged = ranges.some(({ start, end }) => {
+      //     return block.codeRange[0] <= start && end <= block.codeRange[1];
+      //   });
+      //   if (!isChanged) {
+      //     DEBUG && console.log("[mdcf] not changed", virtualFileName);
+      //   }
+      // }
+      const maskedPrefix = rawContent
+        .slice(0, block.codeRange[0])
+        .replace(/[^\n]/g, " ");
       service.writeSnapshot(
         virtualFileName,
         ts.ScriptSnapshot.fromString(maskedPrefix + block.content),
@@ -277,10 +284,68 @@ async function _start(context: vscode.ExtensionContext) {
         index: idx,
       };
     });
-    function getVirtualFileName(originalFileName: string, localId: string) {
-      const finalLocalId = /\.tsx?$/.test(localId) ? localId : `${localId}.tsx`;
+    function getVirtualFileName(
+      originalFileName: string,
+      localId: string,
+      lang?: string,
+    ) {
+      const langExpMap: Record<string, string> = {
+        ts: ".ts",
+        tsx: ".tsx",
+        typescript: ".ts",
+        typescriptreact: ".tsx",
+        js: ".js",
+        javascript: ".js",
+        javascriptreact: ".jsx",
+        html: ".html",
+        css: ".css",
+        svelte: ".svelte",
+      };
+      const ext = lang ? langExpMap[lang] : ".txt";
+      const finalLocalId = localId.endsWith(ext) ? localId : `${localId}${ext}`;
       return `${originalFileName}@${finalLocalId}`;
     }
+  }
+
+  function updateDiagnostics(
+    document: vscode.TextDocument,
+    contentChanges: ReadonlyArray<vscode.TextDocumentContentChangeEvent> = [],
+  ) {
+    // TODO: check intersection
+    const content = document.getText();
+    const changes = contentChanges.map((change) => {
+      // return vscode range
+      return {
+        start: change.rangeOffset,
+        end: change.rangeOffset + change.rangeLength,
+      };
+    });
+    const service = getOrCreateLanguageService(document.uri);
+    const blocks = refresh(service, document.fileName, content, changes);
+    const diags: MyDiagnostic[] = blocks.flatMap((block) => {
+      // Now only typescript
+      if (!block.lang) return [];
+      if (!SUPPORTED_SCRIPTS.includes(block.lang)) return [];
+      // TODO: highlight by language mode
+      const tsSemanticDiagnostics = service.getSemanticDiagnostics(
+        block.vfileName,
+      );
+      // https://code.visualstudio.com/api/language-extensions/programmatic-language-features
+      return tsSemanticDiagnostics.map((diag) => {
+        const start = document.positionAt(diag.start!);
+        const end = document.positionAt(diag.start! + diag.length!);
+        const d = new vscode.Diagnostic(
+          new vscode.Range(start, end),
+          (diag.messageText as string) ?? "unknown",
+          vscode.DiagnosticSeverity.Error,
+        );
+        return {
+          ...d,
+          vfileName: block.vfileName,
+        } as MyDiagnostic;
+      });
+    });
+    diagnosticCollection.set(document.uri, diags);
   }
 
   // https://qiita.com/qvtec/items/31d19dd8b86fcc19465a
@@ -293,7 +358,7 @@ async function _start(context: vscode.ExtensionContext) {
         document: vscode.TextDocument,
         position: vscode.Position,
         _token: vscode.CancellationToken,
-        _context: vscode.CompletionContext,
+        context: vscode.CompletionContext,
       ) {
         if (extensionEnabled === false) return [];
         // offset with range
@@ -312,6 +377,26 @@ async function _start(context: vscode.ExtensionContext) {
           return start <= offset && offset <= end;
         });
         if (!block) return [];
+
+        if (block.lang === "html" || block.lang === "css") {
+          // update virtual content
+          const prefix = document
+            .getText()
+            .slice(0, block.codeRange[0])
+            .replace(/[^\n]/g, " ");
+          const vContent = prefix + block.content;
+          virtualDocuments.set(block.vfileName, vContent);
+          // trigger completion on virtual file
+          const vdocUriString = `mdcf://${block.vfileName}`;
+          console.log("[mdcf:comp]", vdocUriString);
+          const vdocUri = vscode.Uri.parse(vdocUriString);
+          return vscode.commands.executeCommand<vscode.CompletionList>(
+            "vscode.executeCompletionItemProvider",
+            vdocUri,
+            position,
+            context.triggerCharacter,
+          );
+        }
 
         const codeOffset = offset;
         const getEntryDetails = (entryName: string) => {

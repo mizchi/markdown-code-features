@@ -121,7 +121,8 @@ export function createIncrementalLanguageServiceHost(
   projectRoot: string,
   fileNames: string[] = [],
   options?: ts.CompilerOptions,
-  oldHost?: IncrementalLanguageServiceHost,
+  // additional loader
+  onReadFile?: (fileName: string) => string | undefined,
   debug = false,
 ): IncrementalLanguageServiceHost {
   const colorlize = (item: any) => {
@@ -195,10 +196,12 @@ export function createIncrementalLanguageServiceHost(
   function readSnapshotContent(fileName: string) {
     fileName = normalizePath(fileName);
     log("readFileSnapshot", fileName);
+
     if (fileContents.has(fileName)) {
       return fileContents.get(fileName) as string;
     }
-    return ts.sys.readFile(fileName);
+
+    return onReadFile?.(fileName) ?? ts.sys.readFile(fileName);
   }
 
   function writeSnapshot(fileName: string, snapshot: IncrementalSnapshot) {
@@ -317,7 +320,11 @@ export function createIncrementalLanguageServiceHost(
       if (fileContents.has(fname)) {
         return fileContents.get(fname) as string;
       }
-      const rawFileResult = ts.sys.readFile(fname, encode);
+      // const content = ;
+      // if (content) return content;
+
+      const rawFileResult =
+        onReadFile?.(fname) ?? ts.sys.readFile(fname, encode);
       if (rawFileResult) {
         fileContents.set(fname, rawFileResult);
         fileVersions.set(fname, fileVersions.get(fname) ?? 0);
@@ -339,7 +346,7 @@ export function createIncrementalLanguageServiceHost(
         return fileSnapshots.get(fileName)!;
       }
       if (!fs.existsSync(fileName)) return;
-      const raw = ts.sys.readFile(fileName, "utf8")!;
+      const raw = onReadFile?.(fileName) ?? ts.sys.readFile(fileName, "utf8")!;
       return createIncrementalSnapshot(raw);
       // const prev = fileSnapshots.get(fileName);
       // const snapshot = createIncrementalSnapshot(raw, undefined, prev);

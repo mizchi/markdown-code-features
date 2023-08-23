@@ -34,14 +34,16 @@ Install and `markdown-code-features.enabled: true` in .vscode/settings.json
 
 ## TODO
 
-- [ ] load diagnostics on load
 - [x] activate in `.md` and `.mdx`
 - [x] typescript: completion
 - [x] typescript: diagnostics
-- [ ] mdx: completion
+- [ ] typescript: pop over tooltip
+- [x] diagnostics: on load
+- [x] diagnostics: on change other contents
+- [ ] mdx: import/export completion
 - [ ] css: completion
 - [ ] html: completion
-- [ ] Selective update for performance
+- [ ] perf: selective update
 - [ ] compiler: run
 - [ ] compiler: run tests
 - [ ] compiler: run with mdx component
