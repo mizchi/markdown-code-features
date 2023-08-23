@@ -1,7 +1,7 @@
 import { langToExtMap } from "./constants";
 // import path from 'path';
 
-const regex = new RegExp(/```(?<type>[^\n]*)?\n(?<content>[.\s\S\n]*?)\n```/gm);
+const regex = new RegExp(/```(?<type>[^\n]*)?\n(?<content>[.\s\S\n]*?)\n```/gmu);
 type Range = [from: number, to: number];
 export type CodeBlock = {
   blockRange: Range;
@@ -20,9 +20,9 @@ export function extractCodeBlocks(text: string) {
       type?: string;
     };
     const start = match.index!;
-    const end = start + match[0].length;
-    const codeStart = start + 3 + (type?.length ?? 0) + 1;
-    const codeEnd = codeStart + content.length;
+    const end = start + Array.from(match[0]).length;
+    const codeStart = start + 3 + (type ? Array.from(type).length : 0) + 1;
+    const codeEnd = codeStart + Array.from(content).length;
     const [lang, fileName] = type?.split(":") ?? [undefined, undefined];
     blocks.push({
       blockRange: [start, end],
