@@ -378,6 +378,7 @@ async function _start(context: vscode.ExtensionContext) {
         });
         if (!block) return [];
 
+        // Delegate LSP
         if (block.lang === "html" || block.lang === "css") {
           // update virtual content
           const prefix = document
@@ -388,7 +389,7 @@ async function _start(context: vscode.ExtensionContext) {
           virtualDocuments.set(block.vfileName, vContent);
           // trigger completion on virtual file
           const vdocUriString = `mdcf://${block.vfileName}`;
-          console.log("[mdcf:comp]", vdocUriString);
+          // console.log("[mdcf:comp]", vdocUriString);
           const vdocUri = vscode.Uri.parse(vdocUriString);
           return vscode.commands.executeCommand<vscode.CompletionList>(
             "vscode.executeCompletionItemProvider",
