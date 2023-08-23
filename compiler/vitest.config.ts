@@ -1,9 +1,14 @@
 // import {defineConfig} from "vite";
 import { defineConfig } from 'vitest/config'
+import { markdownRunner } from "./src/rollup";
+import path from 'path';
+import ts from 'typescript';
 
 export default defineConfig({
+  plugins: [
+    markdownRunner(),
+  ],
   test: {
-    // inclu
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "spec/**/*.md", "spec/**/*.mdx"],
   }
 })

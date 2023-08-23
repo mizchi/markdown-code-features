@@ -1,6 +1,8 @@
-# aouea
+# Markdown test
+
 
 ```ts
+
 import { hello } from "./index";
 
 hello.sayHello();
@@ -11,6 +13,7 @@ globalThis.gc;
 
 function foooooooo() {
 }
+
 foooooooo();
 
 // global.gc = 1;

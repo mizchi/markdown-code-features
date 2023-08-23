@@ -8,6 +8,7 @@ import {
 } from "./service";
 import { extractCodeBlocks } from "@mizchi/mdcf-compiler/src/index";
 import { tsCompletionEntryToVscodeCompletionItem } from "./vsHelpers";
+import { getVirtualFileName } from "@mizchi/mdcf-compiler/src/markdown";
 
 type MyDiagnostic = vscode.Diagnostic & {
   vfileName: string;
@@ -53,9 +54,10 @@ const DefaultCompilerOptions: ts.CompilerOptions = {
   resolveJsonModule: true,
 };
 
-let extensionEnabled = false;
 const isVirtualFile = (fileName: string) => /\.mdx?@.*/.test(fileName);
-const isExsitedMdx = (fileName: string) => /\.mdx?$/.test(fileName);
+const isMarkdown = (fileName: string) => /\.mdx?$/.test(fileName);
+
+let extensionEnabled = false;
 
 async function _start(context: vscode.ExtensionContext) {
   // fileName -> virtualFiles
@@ -102,7 +104,7 @@ async function _start(context: vscode.ExtensionContext) {
         const service = getOrCreateLanguageService(ev.document.uri);
         service.notifyFileChanged(fileName);
         const mdDocs = vscode.workspace.textDocuments.filter((doc) => {
-          return isExsitedMdx(doc.fileName);
+          return isMarkdown(doc.fileName);
         });
         for (const doc of mdDocs) {
           updateDiagnostics(doc, []);
@@ -137,13 +139,19 @@ async function _start(context: vscode.ExtensionContext) {
     // on close .mdx
     vscode.workspace.onDidCloseTextDocument((ev) => {
       if (!extensionEnabled) return;
-      if (isExsitedMdx(ev.fileName)) {
+      if (isMarkdown(ev.fileName)) {
         // clear diagnostics
         diagnosticCollection.delete(ev.uri);
         const fileNames = virtualContents.get(ev.fileName) ?? [];
         const service = getOrCreateLanguageService(ev.uri);
         fileNames.forEach((vfileName) => service.deleteSnapshot(vfileName));
         virtualContents.delete(ev.fileName);
+        // virtualDocuments.delete(ev.fileName);
+        for (const vkey of virtualDocuments.keys()) {
+          if (vkey.startsWith(ev.fileName)) {
+            virtualDocuments.delete(vkey);
+          }
+        }
       }
     }),
     // mdx: update diagnostics
@@ -152,7 +160,7 @@ async function _start(context: vscode.ExtensionContext) {
         virtualContents.delete(ev.document.fileName);
         return;
       }
-      if (isExsitedMdx(ev.document.fileName)) {
+      if (isMarkdown(ev.document.fileName)) {
         // deboucing
         timeoutId && clearTimeout(timeoutId);
         timeoutId = setTimeout(() => {
@@ -164,7 +172,7 @@ async function _start(context: vscode.ExtensionContext) {
     // mdx: on open
     vscode.workspace.onDidOpenTextDocument((doc) => {
       if (!extensionEnabled) return;
-      if (isExsitedMdx(doc.fileName)) {
+      if (isMarkdown(doc.fileName)) {
         DEBUG && console.log("[mdcf:open]", doc.fileName);
         updateDiagnostics(doc, []);
       }
@@ -193,7 +201,7 @@ async function _start(context: vscode.ExtensionContext) {
   if (vscode.window.activeTextEditor) {
     const fileName = vscode.window.activeTextEditor.document.fileName;
     if (!extensionEnabled) return;
-    if (isExsitedMdx(fileName)) {
+    if (isMarkdown(fileName)) {
       updateDiagnostics(vscode.window.activeTextEditor.document, []);
     }
   }
@@ -250,9 +258,8 @@ async function _start(context: vscode.ExtensionContext) {
     const blocks = extractCodeBlocks(rawContent);
     const lastVirtualFileNames = virtualContents.get(fileName) ?? [];
     // update virtual files
-    const vfileNames = blocks.map((block, idx) => {
-      const id = block.id ?? idx.toString();
-      const virtualFileName = getVirtualFileName(fileName, id, block.lang);
+    const vfileNames = blocks.map((block) => {
+      const virtualFileName = fileName + "@" + getVirtualFileName(block);
       // check is changed
       // if (ranges) {
       //   const isChanged = ranges.some(({ start, end }) => {
@@ -262,19 +269,27 @@ async function _start(context: vscode.ExtensionContext) {
       //     DEBUG && console.log("[mdcf] not changed", virtualFileName);
       //   }
       // }
-      const maskedPrefix = rawContent
+      const prefix = rawContent
         .slice(0, block.codeRange[0])
         .replace(/[^\n]/g, " ");
       service.writeSnapshot(
         virtualFileName,
-        ts.ScriptSnapshot.fromString(maskedPrefix + block.content),
+        ts.ScriptSnapshot.fromString(prefix + block.content),
       );
       return virtualFileName;
     });
     // remove unused virtual files
     lastVirtualFileNames
       .filter((vfileName) => !vfileNames.includes(vfileName))
-      .forEach((vfileName) => service.deleteSnapshot(vfileName));
+      .forEach((vfileName) => {
+        service.deleteSnapshot(vfileName);
+        // virtualDocuments.delete(vfileName);
+        // for (const vkey of virtualDocuments.keys()) {
+        //   if (vkey.startsWith(vfileName)) {
+        //     virtualDocuments.delete(vkey);
+        //   }
+        // }
+      });
     virtualContents.set(fileName, vfileNames);
     DEBUG && console.timeEnd("mdcf:refresh");
     return blocks.map((block, idx) => {
@@ -284,27 +299,6 @@ async function _start(context: vscode.ExtensionContext) {
         index: idx,
       };
     });
-    function getVirtualFileName(
-      originalFileName: string,
-      localId: string,
-      lang?: string,
-    ) {
-      const langExpMap: Record<string, string> = {
-        ts: ".ts",
-        tsx: ".tsx",
-        typescript: ".ts",
-        typescriptreact: ".tsx",
-        js: ".js",
-        javascript: ".js",
-        javascriptreact: ".jsx",
-        html: ".html",
-        css: ".css",
-        svelte: ".svelte",
-      };
-      const ext = lang ? langExpMap[lang] : ".txt";
-      const finalLocalId = localId.endsWith(ext) ? localId : `${localId}${ext}`;
-      return `${originalFileName}@${finalLocalId}`;
-    }
   }
 
   function updateDiagnostics(
