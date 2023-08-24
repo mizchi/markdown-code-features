@@ -1,7 +1,6 @@
 {
   "name": "@mizchi/mdcf-core",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
   "main": "./lib/index.mjs",
   "module": "./lib/index.mjs",
@@ -10,9 +9,14 @@
     ".": {
       "import": "./lib/index.mjs",
       "types": "./lib/index.d.mts"
+    },
+    "./rollup": {
+      "import": "./lib/rollup.mjs",
+      "types": "./lib/rollup.d.mts"
     }
   },
   "scripts": {
+    "prepublishOnly": "pnpm build",
     "build": "tsc -p tsconfig.build.json"
   },
   "devDependencies": {

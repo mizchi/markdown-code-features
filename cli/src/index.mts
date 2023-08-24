@@ -66,7 +66,6 @@ if (command === "check") {
   }
   
   if (diags.length === 0) {
-    console.log("No Error");
     process.exit(0);
   }
   

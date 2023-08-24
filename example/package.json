@@ -1,0 +1,14 @@
+{
+  "name": "@mizchi/mdcf-example",
+  "private": true,
+  "scripts": {
+    "test": "vitest --run"
+  },
+  "dependencies": {
+    "@mizchi/mdcf": "workspace:*",
+    "@mizchi/mdcf-core": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^0.34.1"
+  }
+}
