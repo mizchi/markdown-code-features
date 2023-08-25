@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@mizchi/mdcf-core": "workspace:*",
+    "@rollup/browser": "^3.28.1",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
@@ -24,6 +25,9 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.3",
     "monaco-editor": "^0.41.0",
+    "path-browserify": "^1.0.1",
+    "rollup": "^3.28.0",
+    "rollup-plugin-node-polyfills": "^0.2.1",
     "typescript": "^5.1.6",
     "vite": "^4.4.5",
     "vite-plugin-monaco-editor": "^1.1.0"

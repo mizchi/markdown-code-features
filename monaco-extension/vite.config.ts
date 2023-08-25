@@ -1,12 +1,19 @@
+import { rollup } from "rollup";
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import monacoEditorPlugin from "vite-plugin-monaco-editor";
+// import path from "path-browserify";
 
-// console.log(monacoEditorPlugin);
-
-const prefix = `monaco-editor/esm/vs`;
 // https://vitejs.dev/config/
 export default defineConfig({
+  resolve: {
+    alias: {
+      // path: "/node_modules/path-browserify/index.js",
+      // path: "/node_modules/path-browserify/index.js",
+      "node:path": "/src/lightPath.ts",
+    },
+  },
+  build: {
+    target: "esnext",
+  },
   optimizeDeps: {
     include: [
       `monaco-editor/esm/vs/language/json/json.worker`,

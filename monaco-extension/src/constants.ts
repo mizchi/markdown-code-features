@@ -1,4 +1,4 @@
-export const vfiles: Record<string, string> = {
+export const getVfiles = async () => ({
   "/node_modules/typescript/lib/lib.d.ts": (
     await import("typescript/lib/lib.d.ts?raw")
   ).default,
@@ -227,4 +227,4 @@ export const vfiles: Record<string, string> = {
   "/node_modules/typescript/lib/lib.webworker.iterable.d.ts": (
     await import("typescript/lib/lib.webworker.iterable.d.ts?raw")
   ).default,
-};
+});
