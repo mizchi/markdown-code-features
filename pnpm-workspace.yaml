@@ -2,3 +2,4 @@ packages:
   - core
   - cli
   - vscode-extension
+  - monaco-extension

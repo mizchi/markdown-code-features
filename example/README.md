@@ -4,7 +4,7 @@
 
 ```bash
 $ pnpm install
-$ pnpm @mizchi/mdcf check README.md spec/spec0.md
+$ pnpm mdcf check README.md spec/spec0.md
 ```
 
 ## Example with Typecheck

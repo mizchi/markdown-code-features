@@ -4,7 +4,7 @@ Support diagnostics and completion in markdown code blocks.
 
 https://marketplace.visualstudio.com/items?itemName=mizchi.markdown-code-features
 
-![Alt text](https://raw.githubusercontent.com/mizchi/markdown-code-features/main/vscode-extension/demo.png)
+![](https://raw.githubusercontent.com/mizchi/markdown-code-features/main/vscode-extension/demo.png)
 
 
 ## Features
