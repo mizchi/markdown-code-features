@@ -97,6 +97,9 @@ importers:
       path-browserify:
         specifier: ^1.0.1
         version: 1.0.1
+      prettier:
+        specifier: ^3.0.0
+        version: 3.0.0
       rollup:
         specifier: ^3.28.0
         version: 3.28.0

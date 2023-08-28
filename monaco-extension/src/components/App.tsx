@@ -11,9 +11,16 @@ import { rollup } from "@rollup/browser";
 import type ts from "typescript";
 import type { WorkerApi } from "../worker";
 import { wrap } from "comlink";
+import type { FormatWorkerApi } from "../prettierWorker";
 
 const api = wrap<WorkerApi>(
   new Worker(new URL("../worker.ts", import.meta.url), { type: "module" }),
+);
+
+const formatApi = wrap<FormatWorkerApi>(
+  new Worker(new URL("../prettierWorker.ts", import.meta.url), {
+    type: "module",
+  }),
 );
 
 const initialCode = `
@@ -59,6 +66,9 @@ function useEditor() {
       model,
       theme: "vs-dark",
       fontSize: 16,
+      // "autoIndent": true,
+      formatOnPaste: true,
+      // "formatOnType": true,
       minimap: {
         enabled: false,
       },
@@ -195,6 +205,12 @@ export function App() {
       if (ev.key.toLowerCase() === "r" && ev.ctrlKey) {
         await runPreview(activeEditor?.getValue() ?? "");
       }
+      if (ev.key.toLowerCase() === "s" && ev.metaKey) {
+        ev.preventDefault();
+        await activeEditor?.getAction("editor.action.formatDocument")?.run();
+        refresh(activeEditor?.getValue() ?? "");
+        // localStorage.setItem(PERSIST_KEY, code);
+      }
     };
     window.addEventListener("keydown", onKeydown);
     return () => {
@@ -311,10 +327,25 @@ export function App() {
       },
     });
 
+    // resume
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        const code = activeEditor.getValue();
+        const persisted = localStorage.getItem(PERSIST_KEY);
+        if (persisted) {
+          if (code !== persisted) {
+            activeEditor.setValue(persisted);
+          }
+          refresh(code);
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       d1.dispose();
       d2.dispose();
       d3.dispose();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [activeEditor, model]);
 
@@ -322,6 +353,49 @@ export function App() {
   useEffect(() => {
     if (!activeEditor) return;
     if (!ref.current) return;
+    monaco.languages.registerDocumentFormattingEditProvider("markdown", {
+      async provideDocumentFormattingEdits(model) {
+        const raw = model.getValue();
+        console.log("format with", model.getValue());
+
+        let ret = "";
+        // replace all code blocks with formatted
+        const blocks = extractCodeBlocks(raw);
+        let offset = 0;
+        for (const block of blocks) {
+          if (
+            block.lang === "ts" ||
+            block.lang === "tsx" ||
+            block.lang === "js" ||
+            block.lang === "jsx"
+          ) {
+            const formatted = await formatApi.formatTs(block.content);
+            ret += raw.slice(offset, block.codeRange[0]) + formatted;
+            offset = block.codeRange[1];
+          }
+          if (block.lang === "html") {
+            const formatted = await formatApi.formatHtml(block.content);
+            ret += raw.slice(offset, block.codeRange[0]) + formatted;
+            offset = block.codeRange[1];
+          }
+          if (block.lang === "css") {
+            const formatted = await formatApi.formatCss(block.content);
+            ret += raw.slice(offset, block.codeRange[0]) + formatted;
+            offset = block.codeRange[1];
+          }
+        }
+        // add rest of the document
+        ret += raw.slice(offset);
+
+        // const text = await formatApi.formatMarkdown(model.getValue());
+        return [
+          {
+            range: model.getFullModelRange(),
+            text: ret,
+          },
+        ];
+      },
+    });
     // setTimeout(() => {
     const code = activeEditor.getValue();
     refresh(code);
@@ -363,15 +437,27 @@ export function App() {
       }}
     >
       <div
-        ref={ref}
         style={{
           gridArea: "left",
-          flex: 1,
           width: "100%",
           height: "100%",
           overflow: "hidden",
+          maxWidth: "1000px",
+          margin: "0 auto",
+          alignItems: "center",
+          justifyContent: "center",
         }}
-      />
+      >
+        <div
+          ref={ref}
+          style={{
+            flex: 1,
+            width: "100%",
+            height: "100%",
+            overflow: "hidden",
+          }}
+        />
+      </div>
       {config.showPreview && (
         <div
           style={{
