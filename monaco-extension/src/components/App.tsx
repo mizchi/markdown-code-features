@@ -8,6 +8,13 @@ import {
 import { monaco } from "../monacoHelpers";
 import { extractCodeBlocks, getVirtualFileName } from "@mizchi/mdcf-core";
 import { rollup } from "@rollup/browser";
+import type ts from "typescript";
+import type { WorkerApi } from "../worker";
+import { wrap } from "comlink";
+
+const api = wrap<WorkerApi>(
+  new Worker(new URL("../worker.ts", import.meta.url), { type: "module" }),
+);
 
 const initialCode = `
 # Hello mdcf
@@ -28,6 +35,7 @@ let x: number = "";
 \`\`\`ts
 import { foo } from "./root.mdx@foo.ts";
 console.log(foo.value);
+document.body.innerHTML = foo.value;
 \`\`\`
 `;
 
@@ -82,72 +90,9 @@ function useModel(
   return model;
 }
 
-import ts from "typescript";
-import { getVfiles } from "../constants";
+// import ts from "typescript";
 import { markdownRunner } from "../blowserPlugin";
 import { Preview } from "./Preview";
-// import { markdownRunner } from "@mizchi/mdcf-core/rollup";
-
-const compilerOptions: ts.CompilerOptions = {
-  target: ts.ScriptTarget.ESNext,
-  module: ts.ModuleKind.ESNext,
-  moduleResolution: ts.ModuleResolutionKind.Bundler,
-  allowJs: true,
-  checkJs: true,
-  strict: true,
-  allowImportingTsExtensions: true,
-  noEmit: true,
-  typeRoots: ["node_modules/@types"],
-  paths: {
-    "@*": ["/root.mdx@*"],
-  },
-};
-
-const versions: Record<string, number> = {};
-const vfiles: Record<string, string> = await getVfiles();
-
-function updateVirtualFile(vfileName: string, content: string) {
-  vfiles![vfileName] = content;
-  versions[vfileName] = (versions[vfileName] ?? 0) + 1;
-}
-
-const USE_LSP_LOGS = false;
-
-const host: ts.LanguageServiceHost = {
-  getDefaultLibFileName: () => {
-    return "/node_modules/typescript/lib/lib.d.ts";
-  },
-  readFile: (fileName: string) => {
-    USE_LSP_LOGS && console.log("[readFile]", fileName);
-    return vfiles[fileName];
-  },
-  fileExists: (fileName) => {
-    USE_LSP_LOGS && console.log("[fileExists]", fileName);
-    return true;
-  },
-  getCurrentDirectory: () => {
-    return "/";
-  },
-  getCompilationSettings: () => {
-    return compilerOptions;
-  },
-  getScriptFileNames: () => {
-    USE_LSP_LOGS && console.log("[getScriptFileNames]");
-    return Object.keys(vfiles);
-  },
-  getScriptSnapshot: (fileName) => {
-    USE_LSP_LOGS && console.log("[getScriptSnapshot]", fileName);
-    const content = vfiles[fileName];
-    return ts.ScriptSnapshot.fromString(content ?? "");
-  },
-  getScriptVersion: (fileName) => {
-    USE_LSP_LOGS &&
-      console.log("[getScriptVersion]", fileName, !!versions[fileName]);
-    return versions[fileName] ? versions[fileName].toString() : "0";
-  },
-};
-
-const service = ts.createLanguageService(host);
 
 export function App() {
   const { ref, activeEditor } = useEditor();
@@ -173,7 +118,7 @@ export function App() {
   }, [activeEditor, ref]);
 
   const refresh = useCallback(
-    (code: string) => {
+    async (code: string) => {
       const model = activeEditor?.getModel();
       const blocks = extractCodeBlocks(code);
       const markers: monaco.editor.IMarkerData[] = [];
@@ -184,8 +129,8 @@ export function App() {
           const vcontent =
             code.slice(0, block.codeRange[0]).replace(/[^\n]/gmu, " ") +
             block.content;
-          updateVirtualFile(vfileName, vcontent);
-          const diags = service.getSemanticDiagnostics(vfileName);
+          await api.updateVirtualFile(vfileName, vcontent);
+          const diags = await api.getSemanticDiagnostics(vfileName);
           if (!model) continue;
           const marker = diags.map((diag) =>
             tsSemanticDiagnosticToMonacoMarker(model, diag),
@@ -201,52 +146,61 @@ export function App() {
     [activeEditor],
   );
 
-  const [showPreview, setShowPreview] = useState(false);
+  // const [showPreview, setShowPreview] = useState(false);
   const [previewCode, setPreviewCode] = useState<string | null>(null);
+  const [config, setConfig] = useState<{ showPreview: boolean }>({
+    showPreview: false,
+  });
+
+  const togglePreview = useCallback(() => {
+    const nextConfig = {
+      showPreview: !config.showPreview,
+    };
+    setConfig(nextConfig);
+    localStorage.setItem(CONFIG_PERSIST_KEY, JSON.stringify(nextConfig));
+  }, [config, setConfig]);
+
+  const runPreview = useCallback(
+    async (code: string) => {
+      const bundle = await rollup({
+        input: "/root.mdx",
+        plugins: [
+          {
+            name: "memory-loader",
+            resolveId(id) {
+              if (id === "/root.mdx") return id;
+            },
+          },
+          markdownRunner({
+            entryCode: code,
+            fileName: "/root.mdx",
+          }),
+        ],
+      });
+      // .then(async (bundle) => {
+      const generated = await bundle.generate({
+        format: "es",
+      });
+      // console.log(generated.output[0].code);
+      setPreviewCode(generated.output[0].code);
+    },
+    [setPreviewCode],
+  );
+
   useEffect(() => {
     const onKeydown = async (ev: KeyboardEvent) => {
-      // console.log(ev.key, ev.ctrlKey);
       if (ev.key === "1" && ev.ctrlKey) {
-        setShowPreview((prev) => !prev);
-        // const config = {
-        //   showPreview: showPreview,
-        // };
-        // localStorage.setItem(CONFIG_PERSIST_KEY, JSON.stringify(config));
+        togglePreview();
       }
-      // console.log(ev.key, ev.ctrlKey);
       if (ev.key.toLowerCase() === "r" && ev.ctrlKey) {
-        // const code = activeEditor?.getValue();
-        const bundle = await rollup({
-          input: "/root.mdx",
-          plugins: [
-            {
-              name: "memory-loader",
-              resolveId(id) {
-                if (id === "/root.mdx") return id;
-              },
-            },
-            markdownRunner({
-              entryCode: activeEditor?.getValue() ?? "",
-              fileName: "/root.mdx",
-            }),
-          ],
-        });
-        // .then(async (bundle) => {
-        const generated = await bundle.generate({
-          format: "es",
-        });
-        console.log(generated.output[0].code);
-        setPreviewCode(generated.output[0].code);
-        // console.log("[bundle]", generated.output[0].code);
-        // })
-        // setShowPreview((prev) => !prev);
+        await runPreview(activeEditor?.getValue() ?? "");
       }
     };
     window.addEventListener("keydown", onKeydown);
     return () => {
       window.removeEventListener("keydown", onKeydown);
     };
-  }, [showPreview, setShowPreview, activeEditor, previewCode, setPreviewCode]);
+  }, [togglePreview, activeEditor, previewCode, setPreviewCode]);
 
   useEffect(() => {
     if (!activeEditor) return;
@@ -261,7 +215,6 @@ export function App() {
         tid = null;
         refresh(code);
       }, 300);
-      // refresh(code);
     });
 
     const d2 = activeEditor.onDidChangeModelContent((_ev) => {
@@ -279,7 +232,7 @@ export function App() {
     const d3 = monaco.languages.registerCompletionItemProvider("markdown", {
       triggerCharacters: ["."],
       // https://github.com/microsoft/monaco-editor/blob/38e1e3d097f84e336c311d071a9ffb5191d4ffd1/src/language/typescript/languageFeatures.ts#L440
-      provideCompletionItems(model, position) {
+      async provideCompletionItems(model, position) {
         const offset = model.getOffsetAt(position);
         const content = model.getValue();
 
@@ -299,7 +252,7 @@ export function App() {
             const vcontent =
               content.slice(0, block.codeRange[0]).replace(/[^\n]/gmu, " ") +
               block.content;
-            updateVirtualFile(vfileName, vcontent);
+            await api.updateVirtualFile(vfileName, vcontent);
           }
         }
         const block = blocks.find((b) => {
@@ -311,11 +264,9 @@ export function App() {
         });
         if (!block) return;
 
-        const info = service.getCompletionsAtPosition(
+        const info = await api.getCompletionsAtPosition(
           "/root.mdx@" + getVirtualFileName(block),
           offset,
-          undefined,
-          undefined,
         );
         if (!info) return;
         const suggestions = info.entries.map((entry) => {
@@ -384,12 +335,28 @@ export function App() {
     if (persited) {
       activeEditor.setValue(persited);
     }
+
+    const persitedConfig = localStorage.getItem(CONFIG_PERSIST_KEY);
+    if (persitedConfig) {
+      setConfig(JSON.parse(persitedConfig));
+    }
   }, [activeEditor, ref]);
 
   return (
     <div
       style={{
-        display: "flex",
+        display: "grid",
+        gridTemplateRows: "1fr 32px",
+        gridTemplateColumns: "1fr 1fr",
+        gridTemplateAreas: config.showPreview
+          ? `
+          "left   right"
+          "bottom bottom"
+          `
+          : `
+          "left   left"
+          "bottom bottom"
+          `,
         width: "100%",
         height: "100%",
         overflow: "hidden",
@@ -397,18 +364,73 @@ export function App() {
     >
       <div
         ref={ref}
-        style={{ flex: 1, width: "100%", height: "100%", overflow: "hidden" }}
+        style={{
+          gridArea: "left",
+          flex: 1,
+          width: "100%",
+          height: "100%",
+          overflow: "hidden",
+        }}
       />
-      {showPreview && (
+      {config.showPreview && (
         <div
           style={{
-            width: "50vw",
+            gridArea: "right",
+            width: "100%",
             height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            position: "relative",
           }}
         >
-          {previewCode && <Preview code={previewCode ?? ""} />}
+          <div
+            style={{
+              position: "absolute",
+              right: 0,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                runPreview(activeEditor?.getValue() ?? "");
+              }}
+            >
+              Run[Ctrl+R]
+            </button>
+          </div>
+          {previewCode ? (
+            <Preview code={previewCode ?? ""} />
+          ) : (
+            <>(not run yet)</>
+          )}
         </div>
       )}
+      {/* Footer */}
+      <div
+        style={{
+          gridArea: "bottom",
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          width: "100%",
+          height: "32px",
+          overflow: "hidden",
+          backgroundColor: "#333",
+          color: "#fff",
+        }}
+      >
+        <button type="button" onClick={togglePreview}>
+          👀
+        </button>
+        <a
+          style={{ color: "#88f", paddingRight: "8px" }}
+          rel="noopener noreferrer"
+          target="_blank"
+          href="https://github.com/mizchi/markdown-code-features"
+        >
+          GitHub
+        </a>
+      </div>
     </div>
   );
 }
@@ -429,63 +451,64 @@ function tsSemanticDiagnosticToMonacoMarker(
   };
 }
 
-export class Kind {
-  public static unknown: string = "";
-  public static keyword: string = "keyword";
-  public static script: string = "script";
-  public static module: string = "module";
-  public static class: string = "class";
-  public static interface: string = "interface";
-  public static type: string = "type";
-  public static enum: string = "enum";
-  public static variable: string = "var";
-  public static localVariable: string = "local var";
-  public static function: string = "function";
-  public static localFunction: string = "local function";
-  public static memberFunction: string = "method";
-  public static memberGetAccessor: string = "getter";
-  public static memberSetAccessor: string = "setter";
-  public static memberVariable: string = "property";
-  public static constructorImplementation: string = "constructor";
-  public static callSignature: string = "call";
-  public static indexSignature: string = "index";
-  public static constructSignature: string = "construct";
-  public static parameter: string = "parameter";
-  public static typeParameter: string = "type parameter";
-  public static primitiveType: string = "primitive type";
-  public static label: string = "label";
-  public static alias: string = "alias";
-  public static const: string = "const";
-  public static let: string = "let";
-  public static warning: string = "warning";
-}
+const KindMap = {
+  unknown: "",
+  keyword: "keyword",
+  script: "script",
+  module: "module",
+  class: "class",
+  interface: "interface",
+  type: "type",
+  enum: "enum",
+  variable: "var",
+  localVariable: "local var",
+  function: "function",
+  localFunction: "local function",
+  memberFunction: "method",
+  memberGetAccessor: "getter",
+  memberSetAccessor: "setter",
+  memberVariable: "property",
+  constructorImplementation: "constructor",
+  callSignature: "call",
+  indexSignature: "index",
+  constructSignature: "construct",
+  parameter: "parameter",
+  typeParameter: "type parameter",
+  primitiveType: "primitive type",
+  label: "label",
+  alias: "alias",
+  const: "const",
+  let: "let",
+  warning: "warning",
+};
+
 function convertKind(kind: string): monaco.languages.CompletionItemKind {
   switch (kind) {
-    case Kind.primitiveType:
-    case Kind.keyword:
+    case KindMap.primitiveType:
+    case KindMap.keyword:
       return monaco.languages.CompletionItemKind.Keyword;
-    case Kind.variable:
-    case Kind.localVariable:
+    case KindMap.variable:
+    case KindMap.localVariable:
       return monaco.languages.CompletionItemKind.Variable;
-    case Kind.memberVariable:
-    case Kind.memberGetAccessor:
-    case Kind.memberSetAccessor:
+    case KindMap.memberVariable:
+    case KindMap.memberGetAccessor:
+    case KindMap.memberSetAccessor:
       return monaco.languages.CompletionItemKind.Field;
-    case Kind.function:
-    case Kind.memberFunction:
-    case Kind.constructSignature:
-    case Kind.callSignature:
-    case Kind.indexSignature:
+    case KindMap.function:
+    case KindMap.memberFunction:
+    case KindMap.constructSignature:
+    case KindMap.callSignature:
+    case KindMap.indexSignature:
       return monaco.languages.CompletionItemKind.Function;
-    case Kind.enum:
+    case KindMap.enum:
       return monaco.languages.CompletionItemKind.Enum;
-    case Kind.module:
+    case KindMap.module:
       return monaco.languages.CompletionItemKind.Module;
-    case Kind.class:
+    case KindMap.class:
       return monaco.languages.CompletionItemKind.Class;
-    case Kind.interface:
+    case KindMap.interface:
       return monaco.languages.CompletionItemKind.Interface;
-    case Kind.warning:
+    case KindMap.warning:
       return monaco.languages.CompletionItemKind.File;
   }
 
