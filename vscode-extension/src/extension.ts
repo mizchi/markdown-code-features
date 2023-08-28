@@ -6,9 +6,9 @@ import {
   createIncrementalLanguageService,
   createIncrementalLanguageServiceHost,
 } from "./service";
-import { extractCodeBlocks } from "@mizchi/mdcf-core/src/index";
+import { extractCodeBlocks } from "@mizchi/mdcf-core";
 import { tsCompletionEntryToVscodeCompletionItem } from "./vsHelpers";
-import { getVirtualFileName } from "@mizchi/mdcf-core/src/markdown";
+import { getVirtualFileName } from "@mizchi/mdcf-core";
 
 type MyDiagnostic = vscode.Diagnostic & {
   vfileName: string;
